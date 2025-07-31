@@ -1,6 +1,6 @@
 #include "USB.h"
 #include "USBHIDMouse.h"
-
+#include "Arduino.h"
 USBHIDMouse Mouse;
 
 // Pin-Definitionen
