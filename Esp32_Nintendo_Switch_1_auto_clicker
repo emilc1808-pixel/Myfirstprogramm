@@ -1,0 +1,55 @@
+#include "tusb.h"
+#include "driver/gpio.h"
+
+#define BUTTON_GPIO GPIO_NUM_0
+#define LED_GPIO    GPIO_NUM_2
+
+volatile bool buttonPressed = false;
+
+void IRAM_ATTR button_isr_handler(void* arg) {
+    buttonPressed = true;
+}
+
+void hid_task(void);
+
+int main(void) {
+    // Init GPIO für Button und LED
+    gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
+    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT);
+    
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(BUTTON_GPIO, button_isr_handler, NULL);
+    
+    // tinyusb init
+    tusb_init();
+
+    while (1) {
+        tud_task(); // TinyUSB device task
+
+        if (buttonPressed) {
+            buttonPressed = false;
+            
+            // Send A button press & release at 1 kHz max
+            hid_task();
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+
+// Diese Funktion sendet HID-Report als Switch Pro Controller A Button
+void hid_task(void) {
+    static bool pressed = false;
+    uint8_t report[10] = {0};
+
+    if (pressed) {
+        // Release A button
+        report[4] = 0x00;
+        pressed = false;
+    } else {
+        // Press A button (Bit 0x01 für A)
+        report[4] = 0x01;
+        pressed = true;
+    }
+    tud_hid_report(0, report, sizeof(report));
+}
